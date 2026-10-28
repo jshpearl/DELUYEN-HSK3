@@ -1,521 +1,427 @@
 import streamlit as st
-import time
+import json
+import random
 import requests
-from datetime import datetime
+import datetime
+import os
 
-# ==========================================
-# 1. TRANG TRÍ CSS & CẤU HÌNH GIAO DIỆN
-# ==========================================
+# --- CẤU HÌNH TRANG ---
 st.set_page_config(
-    page_title="LUYỆN ĐỀ HSK3 - Cô Bảo Ngọc",
+    page_title="HSK 3 Master - Cô Bảo Ngọc",
     page_icon="🎓",
-    layout="wide",
+    layout="centered",
     initial_sidebar_state="collapsed"
 )
 
-# Inject Custom CSS cho Font, Màu sắc Pastel, Viền Đậm, Responsive
+# --- WEBHOOK CONFIG ---
+WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbwwH0wE3X1zJ5kK5M3N7P8Q9R0S1T2U3V4W5X6Y7Z/exec"
+
+def send_to_google_sheet(user_name, group_name, score, total, percentage):
+    vn_tz = datetime.timezone(datetime.timedelta(hours=7))
+    vn_now = datetime.datetime.now(vn_tz)
+    payload = {
+        "timestamp": vn_now.strftime("%Y-%m-%d %H:%M:%S"),
+        "name": user_name,
+        "group": group_name,
+        "score": f"{score}/{total}",
+        "percentage": f"{percentage:.1f}%"
+    }
+    try:
+        response = requests.post(WEBHOOK_URL, json=payload, timeout=8)
+        if response.status_code == 200:
+            return True, "Thành công"
+        else:
+            return False, f"HTTP Status {response.status_code}"
+    except Exception as e:
+        return False, str(e)
+
+# --- BẢNG MÀU 7 SẮC PASTEL (HỒNG, TÍM, XANH DƯƠNG, XANH LÁ, VÀNG, CAM, XÁM NÂU) ---
+PASTEL_THEMES = [
+    {
+        "name": "Hồng Pastel", "emoji": "🌸",
+        "bg_gradient": "linear-gradient(135deg, #FDF2F8 0%, #FCE7F3 100%)",
+        "card_bg": "#FDF2F8", "border": "#EC4899", "title_color": "#831843",
+        "fc_front_bg": "linear-gradient(135deg, #FFFFFF 0%, #FDF2F8 100%)", "fc_front_border": "#FBCFE8", "fc_front_text": "#9D174D",
+        "fc_back_bg": "linear-gradient(135deg, #DB2777 0%, #F472B6 100%)", "fc_back_border": "#BE185D",
+        "badge_bg": "#FCE7F3", "badge_text": "#9D174D"
+    },
+    {
+        "name": "Tím Pastel", "emoji": "🟣",
+        "bg_gradient": "linear-gradient(135deg, #FAF5FF 0%, #F3E8FF 100%)",
+        "card_bg": "#FAF5FF", "border": "#A855F7", "title_color": "#581C87",
+        "fc_front_bg": "linear-gradient(135deg, #FFFFFF 0%, #FAF5FF 100%)", "fc_front_border": "#DDD6FE", "fc_front_text": "#6B21A8",
+        "fc_back_bg": "linear-gradient(135deg, #9333EA 0%, #C084FC 100%)", "fc_back_border": "#7E22CE",
+        "badge_bg": "#F3E8FF", "badge_text": "#6B21A8"
+    },
+    {
+        "name": "Xanh Dương Pastel", "emoji": "🔵",
+        "bg_gradient": "linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 100%)",
+        "card_bg": "#F0F9FF", "border": "#0EA5E9", "title_color": "#0C4A6E",
+        "fc_front_bg": "linear-gradient(135deg, #FFFFFF 0%, #F0F9FF 100%)", "fc_front_border": "#BAE6FD", "fc_front_text": "#0369A1",
+        "fc_back_bg": "linear-gradient(135deg, #0284C7 0%, #38BDF8 100%)", "fc_back_border": "#0369A1",
+        "badge_bg": "#E0F2FE", "badge_text": "#0369A1"
+    },
+    {
+        "name": "Xanh Lá Pastel", "emoji": "🟢",
+        "bg_gradient": "linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)",
+        "card_bg": "#F0FDF4", "border": "#22C55E", "title_color": "#14532D",
+        "fc_front_bg": "linear-gradient(135deg, #FFFFFF 0%, #F0FDF4 100%)", "fc_front_border": "#BBF7D0", "fc_front_text": "#15803D",
+        "fc_back_bg": "linear-gradient(135deg, #16A34A 0%, #4ADE80 100%)", "fc_back_border": "#15803D",
+        "badge_bg": "#DCFCE7", "badge_text": "#15803D"
+    },
+    {
+        "name": "Vàng Pastel", "emoji": "🟡",
+        "bg_gradient": "linear-gradient(135deg, #FEFCE8 0%, #FEF9C3 100%)",
+        "card_bg": "#FEFCE8", "border": "#EAB308", "title_color": "#713F12",
+        "fc_front_bg": "linear-gradient(135deg, #FFFFFF 0%, #FEFCE8 100%)", "fc_front_border": "#FEF08A", "fc_front_text": "#A16207",
+        "fc_back_bg": "linear-gradient(135deg, #CA8A04 0%, #FACC15 100%)", "fc_back_border": "#A16207",
+        "badge_bg": "#FEF9C3", "badge_text": "#854D0E"
+    },
+    {
+        "name": "Cam Pastel", "emoji": "🟠",
+        "bg_gradient": "linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%)",
+        "card_bg": "#FFF7ED", "border": "#F97316", "title_color": "#7C2D12",
+        "fc_front_bg": "linear-gradient(135deg, #FFFFFF 0%, #FFF7ED 100%)", "fc_front_border": "#FED7AA", "fc_front_text": "#C2410C",
+        "fc_back_bg": "linear-gradient(135deg, #EA580C 0%, #FB923C 100%)", "fc_back_border": "#C2410C",
+        "badge_bg": "#FFEDD5", "badge_text": "#9A3412"
+    },
+    {
+        "name": "Xám Nâu Pastel", "emoji": "🌰",
+        "bg_gradient": "linear-gradient(135deg, #FAFAF9 0%, #F5F5F4 100%)",
+        "card_bg": "#FAFAF9", "border": "#A8A29E", "title_color": "#44403C",
+        "fc_front_bg": "linear-gradient(135deg, #FFFFFF 0%, #FAFAF9 100%)", "fc_front_border": "#E7E5E4", "fc_front_text": "#57534E",
+        "fc_back_bg": "linear-gradient(135deg, #78350F 0%, #B45309 100%)", "fc_back_border": "#57534E",
+        "badge_bg": "#F5F5F4", "badge_text": "#44403C"
+    }
+]
+
+# --- GLOBAL STYLING WITH 7-PASTEL RAINBOW AURORA ---
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Tahoma&display=swap');
-    
-    html, body, [class*="css"], div, p, span, label {
-        font-family: 'Tahoma', sans-serif;
-        color: #2D3748;
-        line-height: 1.6;
-    }
+    /* 1. Ẩn Sidebar & Header mặc định */
+    [data-testid="stSidebar"] { display: none !important; }
+    [data-testid="stSidebarNav"] { display: none !important; }
+    #MainMenu { visibility: hidden !important; }
+    header { visibility: hidden !important; }
+    footer { visibility: hidden !important; }
+    [data-testid="stHeader"] { display: none !important; }
+    [data-testid="stToolbar"] { display: none !important; }
+    [data-testid="stDecoration"] { display: none !important; }
+    [data-testid="stStatusWidget"] { display: none !important; }
 
-    .zh, .chinese-text, h1, h2, h3, .stRadio label, .stMarkdown {
-        font-family: 'SimSun', '宋体', 'Tahoma', serif;
+    /* 2. Áp dụng Font Tahoma & Nền Pastel 7 màu hòa quyện */
+    html, body, [class*="css"], .stApp {
+        font-family: 'Tahoma', Geneva, Verdana, sans-serif !important;
     }
-
     .stApp {
-        background-color: #F8F9FA;
+        background: linear-gradient(135deg, #FFF5F7 0%, #FEF9C3 20%, #FFEDD5 40%, #DCFCE7 60%, #E0F2FE 80%, #F3E8FF 100%) !important;
     }
 
-    /* Timer Box Header */
-    .timer-container {
-        background-color: #FFF5F5;
-        border: 2.5px solid #E53E3E;
-        padding: 12px 20px;
-        border-radius: 10px;
-        font-size: 22px;
-        font-weight: bold;
-        color: #C53030;
+    /* 3. Header Box Với Cầu Vồng 7 Sắc Pastel */
+    .header-box {
         text-align: center;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 8px rgba(229, 62, 62, 0.15);
-    }
-
-    .timer-warning {
-        animation: blinker 1s linear infinite;
-        background-color: #FED7D7 !important;
-    }
-
-    @keyframes blinker {
-        50% { opacity: 0.5; }
-    }
-
-    .question-box {
-        background-color: #FFFFFF;
-        border-left: 5px solid #4A5568;
-        border-right: 1px solid #E2E8F0;
-        border-top: 1px solid #E2E8F0;
-        border-bottom: 1px solid #E2E8F0;
-        border-radius: 8px;
-        padding: 18px;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.02);
-    }
-
-    .correct-answer {
-        background-color: #F0FFF4;
-        border-left: 5px solid #38A169;
-        padding: 12px;
-        border-radius: 6px;
-        margin-top: 10px;
-    }
-
-    .wrong-answer {
-        background-color: #FFF5F5;
-        border-left: 5px solid #E53E3E;
-        padding: 12px;
-        border-radius: 6px;
-        margin-top: 10px;
-    }
-
-    .congrats-banner {
-        background-color: #EBF8FF;
-        border: 2px solid #3182CE;
-        border-radius: 10px;
-        padding: 20px;
+        padding: 26px 20px;
+        background: linear-gradient(135deg, #EC4899 0%, #A855F7 20%, #0EA5E9 40%, #22C55E 60%, #EAB308 80%, #F97316 100%);
+        border-radius: 20px;
+        color: white;
         margin-bottom: 25px;
-        text-align: center;
+        box-shadow: 0 10px 25px rgba(168, 85, 247, 0.25);
+    }
+    .main-title {
+        font-size: 2.1rem;
+        font-weight: 900;
+        margin: 0;
+        letter-spacing: 0.5px;
+        text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.2);
+    }
+    .sub-title {
+        font-size: 1.05rem;
+        opacity: 0.95;
+        margin-top: 8px;
     }
 
+    /* 4. Thẻ Nhập Họ tên */
+    .user-info-card {
+        background: white;
+        padding: 20px;
+        border-radius: 16px;
+        border: 2px solid #E0E7FF;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.04);
+        margin-bottom: 25px;
+    }
+
+    /* 5. Flashcard 3D Structure */
+    .flip-card {
+        background-color: transparent;
+        width: 100%;
+        height: 240px;
+        perspective: 1000px;
+        margin-bottom: 15px;
+    }
+    .flip-card-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        text-align: center;
+        transition: transform 0.6s;
+        transform-style: preserve-3d;
+        cursor: pointer;
+    }
+    .flip-card:hover .flip-card-inner {
+        transform: rotateY(180deg);
+    }
+    .flip-card-front, .flip-card-back {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+        border-radius: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.06);
+    }
+
+    /* 6. Footer Chữ ký */
     .teacher-footer {
         text-align: center;
-        padding: 30px 0 15px 0;
-        margin-top: 50px;
-        border-top: 1.5px solid #E2E8F0;
-        font-size: 24px;
-        font-weight: bold;
-        color: #2B6CB0;
-        font-family: 'SimSun', '宋体', serif;
+        color: #6B21A8;
+        font-size: 1.35rem;
+        font-weight: 900;
+        margin-top: 40px;
+        margin-bottom: 25px;
+        padding-top: 15px;
+        border-top: 2px dashed #CBD5E1;
+    }
+
+    .congrats-card {
+        background-color: #DCFCE7;
+        border: 2px solid #16A34A;
+        border-radius: 12px;
+        padding: 15px;
+        text-align: center;
+        color: #000000 !important;
+        font-size: 1.3rem;
+        font-weight: 900;
+        margin-top: 10px;
+        margin-bottom: 12px;
     }
 </style>
 """, unsafe_allow_html=True)
 
-
-# ==========================================
-# 2. DỮ LIỆU ĐỀ THI HSK3 (GỒM H31003 & H31008)
-# ==========================================
+# --- LOAD DATA TỪ FILE DATA.JSON ---
 @st.cache_data
-def load_exam_data():
-    # H31003 Full Questions
-    listening_31003 = [
-        {"id": i, "type": "listening_tf", "prompt": f"{i}. ★ 八月十五的月亮大。", "pinyin": "Bā yuè shíwǔ de yuèliang dà.", "options": ["Đúng (√)", "Sai (×)"], "answer": "Đúng (√)", "script": "八月十五的晚上，月亮就像一个白色的大盘子，非常漂亮。中国人喜欢在这一天和家里人一起吃饭，一起看月亮。"} if i <= 10 else
-        {"id": i, "type": "listening_tf", "prompt": f"{i}. ★ 他现在住在公司附近。", "pinyin": "Tā xiànzài zhù zài gōngsī fùjìn.", "options": ["Đúng (√)", "Sai (×)"], "answer": "Đúng (√)", "script": "我搬家了。新的房子虽然小了点儿， लेकिन 离公司很近。"} if i <= 20 else
-        {"id": i, "type": "listening_mc", "prompt": f"{i}. 男的想让小王做什么？", "options": ["A 开门", "B 拿东西", "C 去超市买东西"], "answer": "A 开门", "script": "男：小王，帮我开一下门，好吗？谢谢！\n女：没问题。您去超市了？买了这么多东西。"}
-        for i in range(1, 36)
-    ]
-    
-    reading_31003 = [
-        {"id": i, "type": "fill_gap", "prompt": f"{50+i}. 有些事情看上去很（  ），但要做好，其实不容易。", "options": ["A 简单", "B 举行", "C 像", "D 复习"], "answer": "A 简单", "explanation": "Từ cần điền: 简单 (đơn giản). 有些事情看上去很简单，但要做好，其实不容易。"} if i <= 10 else
-        {"id": i, "type": "reading_mc", "prompt": f"{50+i}. 到了机场，他发现护照不见了，在行李箱里找了半天，也没找到，很着急。\n★ 他为什么着急？", "options": ["A 迟到了", "B 忘记拿机票了", "C 找不到护照了"], "answer": "C 找不到护照了", "explanation": "Nội dung bài đọc nêu rõ: 很着急 vì 不见了护照 (không tìm thấy hộ chiếu)."}
-        for i in range(1, 26)
-    ]
+def load_all_data():
+    json_path = os.path.join(os.path.dirname(__file__), 'data.json')
+    with open(json_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
-    writing_31003 = [
-        {"id": 1, "type": "reorder", "prompt": "1. Sắp xếp từ thành câu đúng (Yêu cầu chính xác 100% cả dấu câu):", "words": ["把", "手机", "送给", "她", "决定", "弟弟", "。"], "correct": "她决定把手机送给弟弟。", "hint": "Cấu trúc câu chữ 把 + Dấu chấm câu 。"},
-        {"id": 2, "type": "reorder", "prompt": "2. Sắp xếp từ thành câu đúng (Yêu cầu chính xác 100% cả dấu câu):", "words": ["我和", "这个学生", "很久", "没见面了", "。"], "correct": "我和这个学生很久没见面了。", "hint": "Chủ ngữ 我和这个学生 + Trạng ngữ 很久 + 没见面了。"},
-        {"id": 3, "type": "reorder", "prompt": "3. Sắp xếp từ thành câu đúng (Yêu cầu chính xác 100% cả dấu câu):", "words": ["那个宾馆的", "环境", "很好", "。"], "correct": "那个宾馆的环境很好。", "hint": "Chủ ngữ 那个宾馆的环境 + Vị ngữ 很好。"},
-        {"id": 4, "type": "reorder", "prompt": "4. Sắp xếp từ thành câu đúng (Yêu cầu chính xác 100% cả dấu câu):", "words": ["你", "完成了", "作业", "吗", "？"], "correct": "你完成了作业吗？", "hint": "Câu hỏi dùng dấu ？ cuối câu."},
-        {"id": 5, "type": "reorder", "prompt": "5. Sắp xếp từ thành câu đúng (Yêu cầu chính xác 100% cả dấu câu):", "words": ["我", "跟", "他", "去", "爬山", "。"], "correct": "我跟他去爬山。", "hint": "Dấu chấm câu 。 đặt ở cuối."},
-        {"id": 6, "type": "char_fill", "prompt": "6. Điền chữ Hán cho phiên âm (yīn): 生病了要注意休息，（ yīn ）为健康最重要。", "correct": "因", "hint": "Chữ Hán: 因 (因为 - yīnwèi)."},
-        {"id": 7, "type": "char_fill", "prompt": "7. Điền chữ Hán cho phiên âm (fù): 考试前要认真（ fù ）习。", "correct": "复", "hint": "Chữ Hán: 复 (复习 - fùxí)."},
-        {"id": 8, "type": "char_fill", "prompt": "8. Điền chữ Hán cho phiên âm (mài): 这件衣服是在哪儿（ mài ）的？", "correct": "卖", "hint": "Chữ Hán: 卖 (mài - bán)."},
-        {"id": 9, "type": "char_fill", "prompt": "9. Điền chữ Hán cho phiên âm (zhàng): 请问，在哪儿（ zhàng ）单？", "correct": "账", "hint": "Chữ Hán: 账 (结账 - jiézhàng)."},
-        {"id": 10, "type": "char_fill", "prompt": "10. Điền chữ Hán cho phiên âm (chūn): （ chūn ）天来了，天气变暖和了。", "correct": "春", "hint": "Chữ Hán: 春 (春天 - chūntiān)."}
-    ]
+ORDERED_GROUPS = load_all_data()
 
-    # H31008 Full Questions
-    listening_31008 = [
-        {"id": i, "type": "listening_tf", "prompt": f"{i}. ★ 努力的人机会多。", "pinyin": "Nǔlì de rén jīhuì duō.", "options": ["Đúng (√)", "Sai (×)"], "answer": "Đúng (√)", "script": "只要你努力，机会总是有的。"} if i <= 10 else
-        {"id": i, "type": "listening_tf", "prompt": f"{i}. ★ 他喜欢吃新鲜的水果。", "pinyin": "Tā xǐhuan chī xīnxiān de shuǐguǒ.", "options": ["Đúng (√)", "Sai (×)"], "answer": "Đúng (√)", "script": "这些苹果真新鲜，我很喜欢吃。"} if i <= 20 else
-        {"id": i, "type": "listening_mc", "prompt": f"{i}. 小张现在在哪儿？", "options": ["A 办公室", "B 图书馆", "C 教室"], "answer": "B 图书馆", "script": "男：小张，你在哪儿呢？\n女：我在图书馆看书呢，一怀茶就回去。"}
-        for i in range(1, 36)
-    ]
+# --- HEADER MAIN ---
+st.markdown('<div class="header-box"><div class="main-title">✨ CHINH PHỤC TỪ VỰNG HSK 3 ✨</div><div class="sub-title">Cùng học và ôn trọn bộ 300 từ vựng HSK3 nhé</div></div>', unsafe_allow_html=True)
 
-    reading_31008 = [
-        {"id": i, "type": "fill_gap", "prompt": f"{50+i}. 最近几年，这里的变化很大，街道更干净了。（  ）", "options": ["A 环境变好了", "B 变化不明显", "C 车辆减少了"], "answer": "A 环境变好了", "explanation": "Môi trường sống tốt lên."} if i <= 10 else
-        {"id": i, "type": "reading_mc", "prompt": f"{50+i}. 人们经常说：“一分耕耘，一分收获。”这句话告诉我们：", "options": ["A 努力就有回报", "B 时间过得很快", "C 要保护环境"], "answer": "A 努力就有回报", "explanation": "Có làm thì mới có ăn, nỗ lực sẽ thu được thành quả."}
-        for i in range(1, 26)
-    ]
+# --- USER NAME INPUT ---
+st.markdown('<div class="user-info-card">', unsafe_allow_html=True)
+user_name = st.text_input("👤 Họ và tên người học (Bắt buộc nhập tên để nộp bài):", value="", placeholder="Vui lòng nhập họ và tên của bạn tại đây...", key="user_name_input")
+st.markdown('</div>', unsafe_allow_html=True)
 
-    writing_31008 = [
-        {"id": 1, "type": "reorder", "prompt": "1. Sắp xếp từ thành câu đúng (Yêu cầu chính xác 100% cả dấu câu):", "words": ["那位", "邻居", "很热情", "。"], "correct": "那位邻居很热情。", "hint": "Dấu chấm câu 。 đặt ở cuối."},
-        {"id": 2, "type": "reorder", "prompt": "2. Sắp xếp từ thành câu đúng (Yêu cầu chính xác 100% cả dấu câu):", "words": ["妈妈", "做好了", "晚饭", "。"], "correct": "妈妈做好了晚饭。", "hint": "Cấu trúc: 主语 + 动词结果补语 + 宾语。"},
-        {"id": 3, "type": "reorder", "prompt": "3. Sắp xếp từ thành câu đúng (Yêu cầu chính xác 100% cả dấu câu):", "words": ["他", "骑马", "骑得", "很好", "。"], "correct": "他骑马骑得很好。", "hint": "Cấu trúc câu bổ ngữ trình độ."},
-        {"id": 4, "type": "reorder", "prompt": "4. Sắp xếp từ thành câu đúng (Yêu cầu chính xác 100% cả dấu câu):", "words": ["今天", "的", "太阳", "真大", "！"], "correct": "今天的太阳真大！", "hint": "Dấu cảm thán ！ ở cuối câu."},
-        {"id": 5, "type": "reorder", "prompt": "5. Sắp xếp từ thành câu đúng (Yêu cầu chính xác 100% cả dấu câu):", "words": ["请问", "公园", "怎么走", "？"], "correct": "请问公园怎么走？", "hint": "Dấu hỏi chấm ？ ở cuối câu."},
-        {"id": 6, "type": "char_fill", "prompt": "6. Điền chữ Hán cho phiên âm (yuǎn): 我家离学校不（ yuǎn ）。", "correct": "远", "hint": "Chữ Hán: 远 (yuǎn - xa)."},
-        {"id": 7, "type": "char_fill", "prompt": "7. Điền chữ Hán cho phiên âm (kè): 同学们都在（ kè ）室里上课。", "correct": "课", "hint": "Chữ Hán: 课 (教室 - jiàoshì)."},
-        {"id": 8, "type": "char_fill", "prompt": "8. Điền chữ Hán cho phiên âm (jié): 祝你生日快（ jié ）！", "correct": "乐", "hint": "Chữ Hán: 乐 (快乐 - kuàilè)."},
-        {"id": 9, "type": "char_fill", "prompt": "9. Điền chữ Hán cho phiên âm (mào): 太阳升起来了，戴上（ mào ）子吧。", "correct": "帽", "hint": "Chữ Hán: 帽 (帽子 - màozi)."},
-        {"id": 10, "type": "char_fill", "prompt": "10. Điền chữ Hán cho phiên âm (xǐ): 饭前要（ xǐ ）手。", "correct": "洗", "hint": "Chữ Hán: 洗 (xǐ - rửa)."}
-    ]
+# --- GROUP SELECTOR ---
+group_titles = [g["title"] for g in ORDERED_GROUPS]
+selected_group_title = st.selectbox("📌 Chọn Nhóm từ vựng để học và làm bài tập:", options=group_titles, index=0)
 
-    return {
-        "H31003": {
-            "title": "H31003",
-            "audio_file": "H31003.mp3",
-            "listening": listening_31003,
-            "reading": reading_31003,
-            "writing": writing_31003
-        },
-        "H31008": {
-            "title": "H31008",
-            "audio_file": "H31008.mp3",
-            "listening": listening_31008,
-            "reading": reading_31008,
-            "writing": writing_31008
-        }
-    }
+group_idx = next(i for i, g in enumerate(ORDERED_GROUPS) if g["title"] == selected_group_title)
+group_info = ORDERED_GROUPS[group_idx]
+
+# Assign 1 of the 7 Pastel Color Themes based on group_idx
+theme = PASTEL_THEMES[group_idx % 7]
 
 
-# ==========================================
-# 3. HÀM GỬI ĐIỂM VỀ GOOGLE SHEET CÔ BẢO NGỌC
-# ==========================================
-def send_score_to_google_sheet(student_name, class_name, exam_code, section, score, total_questions):
-    DEFAULT_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycby7XFJf1fV5aL5UiRY0h-kAxHVszQvUnAgSt5brar-K7Fe7-BV9_ifRTZ7suCPEC1BoHg/exec"
-    webhook_url = st.secrets.get("SHEET_WEBHOOK_URL", DEFAULT_WEBHOOK_URL)
-    
-    payload = {
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "student_name": student_name,
-        "class_name": class_name,
-        "exam_code": exam_code,
-        "section": section,
-        "score": score,
-        "total": total_questions,
-        "percentage": round((score / total_questions) * 100, 1) if total_questions > 0 else 0
-    }
-    
-    if webhook_url:
-        try:
-            requests.post(webhook_url, json=payload, timeout=5)
-            return True
-        except Exception:
-            pass
-            
-    if "sheet_history" not in st.session_state:
-        st.session_state.sheet_history = []
-    st.session_state.sheet_history.append(payload)
-    return True
 
+st.markdown(f"### 📌 {group_info['title']} (20 từ vựng & Bài tập)")
 
-# ==========================================
-# 4. QUẢN LÝ SESSION STATE
-# ==========================================
-if "selected_exam" not in st.session_state:
-    st.session_state.selected_exam = None
+# PHẦN 1: FLASHCARD & BẢNG TỪ VỰNG
+fc_key = f"fc_index_{group_info['id']}"
+show_table_key = f"show_table_{group_info['id']}"
 
-if "student_name" not in st.session_state:
-    st.session_state.student_name = ""
+if fc_key not in st.session_state:
+    st.session_state[fc_key] = 0
+if show_table_key not in st.session_state:
+    st.session_state[show_table_key] = False
 
-if "class_name" not in st.session_state:
-    st.session_state.class_name = ""
+vocab_list = group_info["vocab"]
+curr_idx = st.session_state[fc_key]
+curr_item = vocab_list[curr_idx]
 
-if "submitted_sections" not in st.session_state:
-    st.session_state.submitted_sections = {}
+flip_card_html = f"""
+<div class="flip-card">
+  <div class="flip-card-inner">
+    <div class="flip-card-front" style="background:{theme['fc_front_bg']}; border:3px solid {theme['fc_front_border']}; color:{theme['fc_front_text']};">
+      <div style="font-size:0.95rem; font-weight:800; margin-bottom:8px; opacity:0.8;">✦ CLICK / DI CHUỘT ĐỂ XEM NGHĨA ✦</div>
+      <div style="font-size:3.2rem; font-weight:900;">{curr_item['hanzi']}</div>
+    </div>
+    <div class="flip-card-back" style="background:{theme['fc_back_bg']}; border:3px solid {theme['fc_back_border']}; color:white;">
+      <div style="font-size:2.2rem; font-weight:900; margin-bottom:4px;">{curr_item['hanzi']}</div>
+      <div style="font-size:1.3rem; font-weight:700; color:#FEF08A; margin-bottom:6px;">[{curr_item['pinyin']}] • {curr_item['type']}</div>
+      <div style="font-size:1.4rem; font-weight:900; margin-bottom:10px;">👉 {curr_item['meaning']}</div>
+      <div style="font-size:1.05rem; background:rgba(255,255,255,0.2); padding:8px 12px; border-radius:10px;">💡 {curr_item['example']}</div>
+    </div>
+  </div>
+</div>
+"""
+st.markdown(flip_card_html, unsafe_allow_html=True)
 
-if "exam_start_times" not in st.session_state:
-    st.session_state.exam_start_times = {}
+col_prev, col_num, col_next = st.columns([1, 2, 1])
+with col_prev:
+    if st.button("⬅️ Từ trước", key=f"prev_{group_info['id']}", use_container_width=True):
+        st.session_state[fc_key] = (curr_idx - 1) % len(vocab_list)
+        st.rerun()
+with col_num:
+    st.markdown(f"<div style='text-align:center; font-weight:800; font-size:1.1rem; padding-top:6px; color:{theme['title_color']};'>Thẻ {curr_idx + 1} / {len(vocab_list)}</div>", unsafe_allow_html=True)
+with col_next:
+    if st.button("Từ tiếp ➡️", key=f"next_{group_info['id']}", use_container_width=True):
+        st.session_state[fc_key] = (curr_idx + 1) % len(vocab_list)
+        st.rerun()
 
-if "user_answers" not in st.session_state:
-    st.session_state.user_answers = {}
+st.markdown("<br>", unsafe_allow_html=True)
+btn_table_label = "🙈 Thu gọn Bảng từ vựng" if st.session_state[show_table_key] else "📖 Mở rộng Bảng 20 từ vựng Nhóm này"
+if st.button(btn_table_label, key=f"btn_tb_{group_info['id']}", use_container_width=True):
+    st.session_state[show_table_key] = not st.session_state[show_table_key]
+    st.rerun()
 
+if st.session_state[show_table_key]:
+    table_md = "| STT | Chữ Hán | Phiên âm | Từ loại | Ý nghĩa | Ví dụ minh họa |\n| :---: | :---: | :---: | :---: | :--- | :--- |\n"
+    for v_i, v_data in enumerate(vocab_list, 1):
+        table_md += f"| {v_i} | **{v_data['hanzi']}** | {v_data['pinyin']} | *{v_data['type']}* | {v_data['meaning']} | {v_data['example']} |\n"
+    st.markdown(table_md)
 
-# ==========================================
-# 5. TRANG 1: DANH SÁCH MÃ ĐỀ (GRID HÌNH VUÔNG PASTEL)
-# ==========================================
-def render_landing_page():
-    st.markdown("<h1 style='text-align: center; color: #1A365D; font-size: 36px; font-weight: bold;'>🎓 LUYỆN ĐỀ HSK3</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; font-size: 18px; color: #4A5568;'>Vui lòng điền thông tin và chọn Mã Đề Thi để bắt đầu</p>", unsafe_allow_html=True)
-    st.write("---")
+st.markdown(f"<hr style='border:1px dashed {theme['border']}; margin:25px 0;'>", unsafe_allow_html=True)
 
-    # Form nhập thông tin
-    col_info1, col_info2 = st.columns(2)
-    with col_info1:
-        st.session_state.student_name = st.text_input("👤 Họ và tên học viên:", value=st.session_state.student_name, placeholder="Ví dụ: Nguyễn Văn A")
-    with col_info2:
-        st.session_state.class_name = st.text_input("🏫 Tên lớp:", value=st.session_state.class_name, placeholder="Ví dụ: HSK3-K24")
+# PHẦN 2: BÀI TẬP 4 TABS
+def render_quiz_section(sub_quiz_data, sub_key):
+    submitted_flag = f"sub_submitted_{group_info['id']}_{sub_key}"
+    res_data_flag = f"sub_res_data_{group_info['id']}_{sub_key}"
 
-    st.write("")
-    st.markdown("### 📋 Danh sách Mã Đề Thi:")
+    if submitted_flag not in st.session_state:
+        st.session_state[submitted_flag] = False
 
-    exams = load_exam_data()
-    exam_codes = list(exams.keys())
+    if st.session_state[submitted_flag] and res_data_flag in st.session_state:
+        res = st.session_state[res_data_flag]
+        st.markdown('''<div class="congrats-card">🎉 Chúc mừng bạn đã làm xong! Chăm chỉ quá!</div>''', unsafe_allow_html=True)
 
-    # Grid Pastel viền màu đậm
-    cols = st.columns(2)
-    pastel_colors = ["#E8F0FE", "#E6F4EA"]
-    border_colors = ["#1A365D", "#137333"]
+        st.metric("Kết quả làm bài", f"{res['score']} / {res['total']} câu đúng", f"{res['pct']:.1f}%")
 
-    for idx, code in enumerate(exam_codes):
-        with cols[idx % 2]:
-            p_bg = pastel_colors[idx % len(pastel_colors)]
-            p_border = border_colors[idx % len(border_colors)]
-            
-            st.markdown(f"""
-            <div style="background-color: {p_bg}; border: 3px solid {p_border}; border-radius: 14px; padding: 25px 15px; text-align: center; margin-bottom: 15px;">
-                <div style="font-size: 32px; font-weight: bold; color: {p_border}; font-family: 'Tahoma', sans-serif;">{code}</div>
-            </div>
-            """, unsafe_allow_html=True)
+        if res['score'] < res['total']:
+            st.markdown('''<div style="background-color: #FEF3C7; border: 2px solid #F59E0B; border-radius: 12px; padding: 12px 16px; margin-top: 10px; margin-bottom: 15px; color: #92400E; font-weight: 800; text-align: center; font-size: 1.05rem;">💡 Bạn hãy kiểm tra lại danh sách câu hỏi bên dưới để xem đáp án đúng và lời giải thích chi tiết cho các câu làm chưa chính xác nhé!</div>''', unsafe_allow_html=True)
 
-            if st.button(f"👉 Vào làm đề {code}", key=f"btn_{code}", use_container_width=True):
-                if not st.session_state.student_name.strip():
-                    st.error("⚠️ Vui lòng nhập Họ và tên trước khi vào thi!")
-                elif not st.session_state.class_name.strip():
-                    st.error("⚠️ Vui lòng nhập Tên lớp trước khi vào thi!")
-                else:
-                    st.session_state.selected_exam = code
-                    st.rerun()
-
-    # Footer
-    st.markdown("<div class='teacher-footer'>黄宝玉老师</div>", unsafe_allow_html=True)
-
-
-# ==========================================
-# 6. TRANG 2: TRANG LÀM BÀI CÁC PHẦN (3 TABS)
-# ==========================================
-def render_exam_page(exam_code):
-    exams = load_exam_data()
-    exam = exams[exam_code]
-
-    col_head1, col_head2 = st.columns([3, 1])
-    with col_head1:
-        st.markdown(f"## 📝 Đề Thi: <span style='color:#1A365D;'>{exam_code}</span>", unsafe_allow_html=True)
-        st.markdown(f"**Học viên:** `{st.session_state.student_name}` | **Lớp:** `{st.session_state.class_name}`")
-    with col_head2:
-        if st.button("⬅️ Trở về chọn đề khác"):
-            st.session_state.selected_exam = None
-            st.rerun()
-
-    st.write("---")
-
-    SECTION_TIMES = {
-        "listening": 35 * 60,
-        "reading": 30 * 60,
-        "writing": 15 * 60
-    }
-
-    if exam_code not in st.session_state.exam_start_times:
-        st.session_state.exam_start_times[exam_code] = {
-            "listening": time.time(),
-            "reading": time.time(),
-            "writing": time.time()
-        }
-
-    tab_listen, tab_read, tab_write = st.tabs(["🎧 PHẦN NGHE (Listening)", "📖 PHẦN ĐỌC (Reading)", "✍️ PHẦN VIẾT (Writing)"])
-
-    with tab_listen:
-        render_section_tab(
-            exam_code=exam_code,
-            section_key="listening",
-            section_title="PHẦN NGHE (听力)",
-            questions=exam["listening"],
-            max_time_sec=SECTION_TIMES["listening"],
-            audio_file=exam["audio_file"]
-        )
-
-    with tab_read:
-        render_section_tab(
-            exam_code=exam_code,
-            section_key="reading",
-            section_title="PHẦN ĐỌC (阅读)",
-            questions=exam["reading"],
-            max_time_sec=SECTION_TIMES["reading"]
-        )
-
-    with tab_write:
-        render_section_tab(
-            exam_code=exam_code,
-            section_key="writing",
-            section_title="PHẦN VIẾT (书写)",
-            questions=exam["writing"],
-            max_time_sec=SECTION_TIMES["writing"]
-        )
-
-    st.markdown("<div class='teacher-footer'>黄宝玉老师</div>", unsafe_allow_html=True)
-
-
-# ==========================================
-# 7. HÀM HIỂN THỊ CHI TIẾT TỪNG PHẦN THI
-# ==========================================
-def render_section_tab(exam_code, section_key, section_title, questions, max_time_sec, audio_file=None):
-    st.subheader(f"📌 {section_title}")
-
-    section_id = f"{exam_code}_{section_key}"
-    is_submitted = st.session_state.submitted_sections.get(section_id, False)
-
-    start_time = st.session_state.exam_start_times[exam_code][section_key]
-    elapsed = time.time() - start_time
-    remaining_sec = max(0, int(max_time_sec - elapsed))
-
-    # JavaScript Đồng hồ đếm ngược chạy thực tế theo giây
-    if not is_submitted:
-        st.markdown(f"""
-        <div id="timer_box_{section_id}" class="timer-container">
-            ⏱️ Thời gian còn lại: <span id="timer_display_{section_id}">--:--</span>
-        </div>
-
-        <script>
-            (function() {{
-                var totalSeconds = {remaining_sec};
-                var display = document.getElementById("timer_display_{section_id}");
-                var box = document.getElementById("timer_box_{section_id}");
-
-                function updateTimer() {{
-                    if (totalSeconds <= 0) {{
-                        display.innerHTML = "00:00 - ĐÃ HẾT GIỜ!";
-                        if (box) box.className = "timer-container timer-warning";
-                        return;
-                    }}
-
-                    var minutes = Math.floor(totalSeconds / 60);
-                    var seconds = totalSeconds % 60;
-
-                    var mStr = minutes < 10 ? "0" + minutes : minutes;
-                    var sStr = seconds < 10 ? "0" + seconds : seconds;
-
-                    if (display) display.innerHTML = mStr + ":" + sStr;
-
-                    if (totalSeconds <= 300) {{
-                        if (box) box.className = "timer-container timer-warning";
-                    }}
-
-                    totalSeconds--;
-                }}
-
-                updateTimer();
-                setInterval(updateTimer, 1000);
-            }})();
-        </script>
-        """, unsafe_allow_html=True)
-
-        if remaining_sec <= 0:
-            st.error("🚨 ĐÃ HẾT GIỜ LÀM BÀI! Tự động nộp phần này...")
-            st.session_state.submitted_sections[section_id] = True
-            is_submitted = True
-            st.rerun()
-
-    # Trình phát Audio gọn gàng
-    if audio_file and section_key == "listening":
-        st.audio(f"{audio_file}", format="audio/mp3")
-
-    st.write("")
-
-    answers_key_prefix = f"ans_{exam_code}_{section_key}"
-
-    for idx, q in enumerate(questions):
-        q_id = q["id"]
-        q_key = f"{answers_key_prefix}_{q_id}"
-
-        st.markdown("<div class='question-box'>", unsafe_allow_html=True)
-        st.markdown(f"**Câu {idx + 1}:** <span class='chinese-text' style='font-size:18px;'>{q['prompt']}</span>", unsafe_allow_html=True)
-        if "pinyin" in q:
-            st.markdown(f"<small style='color:#666;'>Pinyin: {q['pinyin']}</small>", unsafe_allow_html=True)
-
-        if not is_submitted:
-            if q["type"] in ["listening_tf", "listening_mc", "fill_gap", "reading_mc"]:
-                user_ans = st.radio("Chọn đáp án:", q["options"], key=q_key, index=None)
-                st.session_state.user_answers[q_key] = user_ans
-            elif q["type"] in ["reorder", "char_fill"]:
-                if q["type"] == "reorder":
-                    st.caption("Từ gợi ý: " + " / ".join([f"`{w}`" for w in q.get("words", [])]))
-                user_ans = st.text_input("Nhập câu hoàn chỉnh (Yêu cầu đúng cả dấu câu như 。, ？):", key=q_key)
-                st.session_state.user_answers[q_key] = user_ans
+        if res['ok']:
+            st.success(f"✅ Đã gửi điểm về Sheet cho cô Bảo Ngọc ({user_name.strip()}: {res['score']}/{res['total']})")
         else:
-            user_ans = st.session_state.user_answers.get(q_key, "")
-            
-            if q["type"] in ["reorder", "char_fill"]:
-                is_correct = (user_ans.strip() == q["correct"].strip())
-                expected = q["correct"]
+            st.info(f"ℹ️ Đã ghi nhận điểm trên ứng dụng: {res['score']}/{res['total']} câu đúng. ({res['msg']})")
+
+    user_ans = {}
+    for q_i, q_data in enumerate(sub_quiz_data):
+        # Khung câu hỏi thiết kế theo chủ đề Pastel của nhóm
+        q_card_html = f"""
+        <div style="background-color:{theme['card_bg']}; border-left:5px solid {theme['border']}; border-radius:12px; padding:14px 18px; margin-top:15px; margin-bottom:12px; box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+            <div style="color:{theme['title_color']}; font-size:1.12rem; font-weight:800; line-height:1.5;">Câu {q_i + 1}: {q_data['q']}</div>
+        </div>
+        """
+        st.markdown(q_card_html, unsafe_allow_html=True)
+
+        shuffled_key = f"shuffled_opts_{group_info['id']}_{sub_key}_{q_i}"
+        if shuffled_key not in st.session_state:
+            opts = list(q_data["options"])
+            random.shuffle(opts)
+            st.session_state[shuffled_key] = opts
+        else:
+            opts = st.session_state[shuffled_key]
+
+        radio_key = f"q_{group_info['id']}_{sub_key}_{q_i}"
+        ans = st.radio(
+            f"Chọn đáp án câu {q_i + 1}:",
+            opts,
+            key=radio_key,
+            index=None,
+            label_visibility="collapsed"
+        )
+        user_ans[q_i] = ans
+
+        if st.session_state[submitted_flag]:
+            if ans == q_data["ans"]:
+                st.success(f"✅ Đúng! ({q_data['ans']}) — {q_data['exp']}")
+            elif ans is not None:
+                st.error(f"❌ Chưa đúng! Đáp án đúng là: **{q_data['ans']}** — 💡 {q_data['exp']}")
             else:
-                is_correct = (user_ans == q["answer"])
-                expected = q["answer"]
+                st.warning(f"⚠️ Chưa trả lời. Đáp án đúng là: **{q_data['ans']}** — 💡 {q_data['exp']}")
 
-            if is_correct:
-                st.markdown(f"<div class='correct-answer'>✅ <b>Chính xác!</b> Đáp án của bạn: <code>{user_ans}</code></div>", unsafe_allow_html=True)
-            else:
-                st.markdown(f"""
-                <div class='wrong-answer'>
-                    ❌ <b>Chưa đúng!</b><br>
-                    • Đáp án của bạn: <code style='color:red;'>{user_ans if user_ans else '(Chưa trả lời)'}</code><br>
-                    • Đáp án chuẩn: <code style='color:green;'>{expected}</code>
-                </div>
-                """, unsafe_allow_html=True)
+        st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
 
-            if "script" in q:
-                with st.expander("📝 Xem Script bài nghe"):
-                    st.write(q["script"])
-            if "explanation" in q:
-                with st.expander("💡 Giải thích đáp án"):
-                    st.write(q["explanation"])
+    col_btn1, col_btn2 = st.columns([1, 1])
+    with col_btn1:
+        sub_btn = st.button(f"🚀 Nộp bài - {sub_key}", key=f"btn_sub_{group_info['id']}_{sub_key}", type="primary", use_container_width=True)
+    with col_btn2:
+        redo_btn = st.button(f"🔄 Làm lại phần này", key=f"btn_redo_{group_info['id']}_{sub_key}", use_container_width=True)
 
-        st.markdown("</div>", unsafe_allow_html=True)
+    if redo_btn:
+        st.session_state[submitted_flag] = False
+        if res_data_flag in st.session_state:
+            del st.session_state[res_data_flag]
+        for q_i in range(len(sub_quiz_data)):
+            r_k = f"q_{group_info['id']}_{sub_key}_{q_i}"
+            if r_k in st.session_state:
+                del st.session_state[r_k]
+        st.rerun()
 
-    st.write("")
-    if not is_submitted:
-        if st.button(f"🚀 NỘP BÀI {section_title.upper()}", key=f"sub_btn_{section_id}", type="primary"):
-            st.session_state.submitted_sections[section_id] = True
+    if sub_btn:
+        if not user_name or not user_name.strip() or user_name.strip().lower() in ["", "học viên hsk3"]:
+            st.warning("⚠️ Vui lòng nhập Họ và tên ở ô thông tin phía trên trước khi nộp bài!")
+        else:
+            st.session_state[submitted_flag] = True
+            score = 0
+            unans = 0
+            for q_i, q_data in enumerate(sub_quiz_data):
+                ans = user_ans.get(q_i)
+                if ans is None:
+                    unans += 1
+                elif ans == q_data["ans"]:
+                    score += 1
 
-            correct_count = 0
-            for q in questions:
-                q_key = f"{answers_key_prefix}_{q['id']}"
-                u_a = st.session_state.user_answers.get(q_key, "")
-                if q["type"] in ["reorder", "char_fill"]:
-                    if u_a.strip() == q["correct"].strip():
-                        correct_count += 1
-                else:
-                    if u_a == q["answer"]:
-                        correct_count += 1
+            total = len(sub_quiz_data)
+            pct = (score / total) * 100
 
-            send_score_to_google_sheet(
-                student_name=st.session_state.student_name,
-                class_name=st.session_state.class_name,
-                exam_code=exam_code,
-                section=section_key,
-                score=correct_count,
-                total_questions=len(questions)
-            )
+            with st.spinner("Đang gửi điểm về Google Sheet cho cô Bảo Ngọc..."):
+                ok, msg = send_to_google_sheet(
+                    user_name=user_name.strip(),
+                    group_name=f"{group_info['title']} - {sub_key}",
+                    score=score,
+                    total=total,
+                    percentage=pct
+                )
+
+            st.session_state[res_data_flag] = {
+                "score": score,
+                "total": total,
+                "pct": pct,
+                "unans": unans,
+                "ok": ok,
+                "msg": msg
+            }
 
             st.rerun()
-    else:
-        correct_count = sum([
-            1 for q in questions if (
-                (st.session_state.user_answers.get(f"{answers_key_prefix}_{q['id']}", "").strip() == q["correct"].strip())
-                if q["type"] in ["reorder", "char_fill"]
-                else (st.session_state.user_answers.get(f"{answers_key_prefix}_{q['id']}", "") == q["answer"])
-            )
-        ])
-        total_q = len(questions)
-        pct = round((correct_count / total_q) * 100, 1)
 
-        st.markdown(f"""
-        <div class="congrats-banner">
-            <h3 style="color: #2B6CB0; margin-bottom: 10px;">🎉 Chúc mừng <b>"{st.session_state.student_name}"</b> đã hoàn thành đề <b>"{exam_code}"</b> ({section_title})</h3>
-            <p style="font-size: 20px; color: #2D3748; margin: 0;">📊 Điểm số của bạn là: <b style="color: #2B6CB0; font-size: 24px;">{correct_count}/{total_q}</b> câu đúng (<b>{pct}%</b>)</p>
-        </div>
-        """, unsafe_allow_html=True)
+sub_tab1, sub_tab2, sub_tab3, sub_tab4 = st.tabs(["📝 1. Kiểm tra từ vựng", "✏️ 2. Điền vào chỗ trống", "🧩 3. Sắp xếp câu", "💬 4. Chọn câu trả lời"])
 
+with sub_tab1:
+    render_quiz_section(group_info["tab1"], "Kiểm tra từ vựng")
+with sub_tab2:
+    render_quiz_section(group_info["tab2"], "Điền vào chỗ trống")
+with sub_tab3:
+    render_quiz_section(group_info["tab3"], "Sắp xếp câu")
+with sub_tab4:
+    render_quiz_section(group_info["tab4"], "Chọn câu trả lời")
 
-def main():
-    if st.session_state.selected_exam is None:
-        render_landing_page()
-    else:
-        render_exam_page(st.session_state.selected_exam)
-
-if __name__ == "__main__":
-    main()
+st.markdown('<div class="teacher-footer">黄宝玉老师</div>', unsafe_allow_html=True)
