@@ -2,12 +2,13 @@ import streamlit as st
 import time
 import requests
 from datetime import datetime
+import streamlit.components.v1 as components
 
 # ==========================================
 # 1. TRANG TRÍ CSS & CẤU HÌNH GIAO DIỆN
 # ==========================================
 st.set_page_config(
-    page_title="Hệ thống Luyện thi HSK3 - Cô Bảo Ngọc",
+    page_title="LUYỆN ĐỀ HSK3",
     page_icon="🎓",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -47,28 +48,6 @@ st.markdown("""
         margin-bottom: 20px;
     }
 
-    /* Header & Đồng hồ */
-    .timer-box {
-        background-color: #FFF5F5;
-        border: 2px solid #E53E3E;
-        padding: 10px 20px;
-        border-radius: 8px;
-        font-size: 20px;
-        font-weight: bold;
-        color: #C53030;
-        text-align: center;
-        margin-bottom: 15px;
-    }
-
-    .timer-warning {
-        animation: blinker 1s linear infinite;
-        background-color: #FED7D7 !important;
-    }
-
-    @keyframes blinker {
-        50% { opacity: 0.5; }
-    }
-
     /* CSS cho Bảng điểm & Câu hỏi */
     .question-box {
         background-color: #FFFFFF;
@@ -76,25 +55,37 @@ st.markdown("""
         border-right: 1px solid #E2E8F0;
         border-top: 1px solid #E2E8F0;
         border-bottom: 1px solid #E2E8F0;
-        border-radius: 6px;
-        padding: 16px;
+        border-radius: 8px;
+        padding: 18px;
         margin-bottom: 18px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.02);
     }
 
     .correct-answer {
         background-color: #F0FFF4;
         border-left: 5px solid #38A169;
-        padding: 10px;
-        border-radius: 4px;
-        margin-top: 8px;
+        padding: 12px;
+        border-radius: 6px;
+        margin-top: 10px;
     }
 
     .wrong-answer {
         background-color: #FFF5F5;
         border-left: 5px solid #E53E3E;
-        padding: 10px;
-        border-radius: 4px;
-        margin-top: 8px;
+        padding: 12px;
+        border-radius: 6px;
+        margin-top: 10px;
+    }
+
+    /* Success Card Banner khi hoàn thành */
+    .completion-banner {
+        background-color: #E6F4EA;
+        border: 2.5px solid #137333;
+        border-radius: 12px;
+        padding: 22px 18px;
+        text-align: center;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 12px rgba(19, 115, 51, 0.1);
     }
 
     /* Footer Cô Bảo Ngọc */
@@ -146,7 +137,7 @@ def load_exam_data():
                     "prompt": "21. 男的想让小王做什么？",
                     "options": ["A 开门", "B 拿东西", "C 去超市买东西"],
                     "answer": "A 开门",
-                    "script": "男：小王，帮我开一下门，好吗？谢谢！\n女：没问题。您去超市了？ bought 这么多东西。"
+                    "script": "男：小王，帮我开一下门，好吗？谢谢！\n女：没问题。您去超市了？买这么多东西。"
                 },
                 {
                     "id": 4,
@@ -188,7 +179,7 @@ def load_exam_data():
                     "prompt": "62. 人们经常说：“面包会有的，牛奶也会有的。”是的，如果努力，什么都会有的。\n★ 这句话主要想告诉我们：",
                     "options": ["A 要相信别人", "B 兴趣最重要", "C 努力才有希望"],
                     "answer": "C 努力才有希望",
-                    "explanation": "Chủ đề chính: 如果努力，什么都会有的 (Nỗ力 mới có hy vọng)."
+                    "explanation": "Chủ đề chính: 如果努力，什么都会有的 (Nỗ lực mới có hy vọng)."
                 }
             ],
             "writing": [
@@ -325,15 +316,15 @@ def load_exam_data():
 # ==========================================
 # 3. HÀM GỬI ĐIỂM VỀ GOOGLE SHEET CÔ BẢO NGỌC
 # ==========================================
-def send_score_to_google_sheet(student_name, student_id, exam_code, section, score, total_questions):
-    # Đường dẫn Google Sheets Webhook App URL mặc định của Cô Bảo Ngọc
+def send_score_to_google_sheet(student_name, class_name, exam_code, section, score, total_questions):
     DEFAULT_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycby7XFJf1fV5aL5UiRY0h-kAxHVszQvUnAgSt5brar-K7Fe7-BV9_ifRTZ7suCPEC1BoHg/exec"
     webhook_url = st.secrets.get("SHEET_WEBHOOK_URL", DEFAULT_WEBHOOK_URL)
     
     payload = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "student_name": student_name,
-        "student_id": student_id,
+        "student_id": class_name,  # Lưu tên lớp vào cột lớp/mã số
+        "class_name": class_name,
         "exam_code": exam_code,
         "section": section,
         "score": score,
@@ -345,8 +336,8 @@ def send_score_to_google_sheet(student_name, student_id, exam_code, section, sco
         try:
             requests.post(webhook_url, json=payload, timeout=5)
             return True
-        except Exception as e:
-            st.warning(f"Không thể kết nối tự động tới Google Sheet: {e}")
+        except Exception:
+            pass
             
     if "sheet_history" not in st.session_state:
         st.session_state.sheet_history = []
@@ -355,7 +346,67 @@ def send_score_to_google_sheet(student_name, student_id, exam_code, section, sco
 
 
 # ==========================================
-# 4. QUẢN LÝ SESSION STATE
+# 4. COMPONENT ĐỒNG HỒ ĐẾM NGƯỢC JAVASCRIPT THỰC TẾ
+# ==========================================
+def render_live_timer(remaining_sec, section_key):
+    timer_html = f"""
+    <div id="timer-card-{section_key}" style="
+        background-color: #FFF5F5;
+        border: 2.5px solid #E53E3E;
+        padding: 12px 20px;
+        border-radius: 10px;
+        font-size: 20px;
+        font-weight: bold;
+        color: #C53030;
+        text-align: center;
+        font-family: 'Tahoma', sans-serif;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        margin-bottom: 10px;
+    ">
+        ⏱️ Thời gian còn lại: <span id="time-display-{section_key}">--:--</span>
+        <span id="warning-text-{section_key}" style="display:none; color:#C53030; margin-left:10px; font-size:16px;">⚠️ SẮP HẾT GIỜ!</span>
+    </div>
+    <script>
+        (function() {{
+            var totalSeconds = {remaining_sec};
+            var timerCard = document.getElementById("timer-card-{section_key}");
+            var timeDisplay = document.getElementById("time-display-{section_key}");
+            var warningText = document.getElementById("warning-text-{section_key}");
+            
+            function updateTimer() {{
+                if (totalSeconds <= 0) {{
+                    timeDisplay.innerHTML = "00:00 - ĐÃ HẾT GIỜ!";
+                    timerCard.style.backgroundColor = "#FED7D7";
+                    timerCard.style.color = "#9B2C2C";
+                    return;
+                }}
+                
+                var mins = Math.floor(totalSeconds / 60);
+                var secs = totalSeconds % 60;
+                var minsStr = mins < 10 ? "0" + mins : mins;
+                var secsStr = secs < 10 ? "0" + secs : secs;
+                
+                timeDisplay.innerHTML = minsStr + ":" + secsStr;
+                
+                if (totalSeconds <= 300) {{
+                    warningText.style.display = "inline";
+                    timerCard.style.backgroundColor = "#FED7D7";
+                    timerCard.style.borderColor = "#E53E3E";
+                }}
+                
+                totalSeconds--;
+            }}
+            
+            updateTimer();
+            setInterval(updateTimer, 1000);
+        }})();
+    </script>
+    """
+    components.html(timer_html, height=75)
+
+
+# ==========================================
+# 5. QUẢN LÝ SESSION STATE
 # ==========================================
 if "selected_exam" not in st.session_state:
     st.session_state.selected_exam = None
@@ -363,8 +414,8 @@ if "selected_exam" not in st.session_state:
 if "student_name" not in st.session_state:
     st.session_state.student_name = ""
 
-if "student_id" not in st.session_state:
-    st.session_state.student_id = ""
+if "class_name" not in st.session_state:
+    st.session_state.class_name = ""
 
 if "submitted_sections" not in st.session_state:
     st.session_state.submitted_sections = {}
@@ -377,19 +428,19 @@ if "user_answers" not in st.session_state:
 
 
 # ==========================================
-# 5. TRANG 1: DANH SÁCH MÃ ĐỀ (GRID HÌNH VUÔNG PASTEL)
+# 6. TRANG 1: DANH SÁCH MÃ ĐỀ (LUYỆN ĐỀ HSK3)
 # ==========================================
 def render_landing_page():
-    st.markdown("<h1 style='text-align: center; color: #1A365D;'>🎓 HỆ THỐNG THI THỬ HSK3 ONLINE</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; font-size: 18px; color: #4A5568;'>Vui lòng chọn Mã Đề Thi bên dưới để bắt đầu làm bài</p>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: #1A365D; font-weight: bold;'>LUYỆN ĐỀ HSK3</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; font-size: 18px; color: #4A5568;'>Vui lòng nhập thông tin học viên và chọn Mã Đề Thi để bắt đầu</p>", unsafe_allow_html=True)
     st.write("---")
 
-    # Nhập thông tin thí sinh
+    # Nhập thông tin thí sinh: Họ tên & Tên lớp (Bỏ mã học viên)
     col_info1, col_info2 = st.columns(2)
     with col_info1:
         st.session_state.student_name = st.text_input("👤 Họ và tên học viên:", value=st.session_state.student_name, placeholder="Ví dụ: Nguyễn Văn A")
     with col_info2:
-        st.session_state.student_id = st.text_input("🆔 Mã số học viên / Lớp:", value=st.session_state.student_id, placeholder="Ví dụ: HSK3-K24")
+        st.session_state.class_name = st.text_input("🏫 Tên lớp:", value=st.session_state.class_name, placeholder="Ví dụ: Lớp HSK3-K24")
 
     st.write("")
     st.markdown("### 📋 Danh sách Mã Đề Thi HSK3:")
@@ -417,7 +468,7 @@ def render_landing_page():
 
             if st.button(f"👉 Vào làm đề {code}", key=f"btn_{code}", use_container_width=True):
                 if not st.session_state.student_name.strip():
-                    st.error("⚠️ Vui lòng nhập Họ và Tên trước khi vào thi!")
+                    st.error("⚠️ Vui lòng nhập Họ và Tên học viên trước khi bắt đầu!")
                 else:
                     st.session_state.selected_exam = code
                     st.rerun()
@@ -427,7 +478,7 @@ def render_landing_page():
 
 
 # ==========================================
-# 6. TRANG 2: TRANG LÀM BÀI CÁC PHẦN (3 TABS)
+# 7. TRANG 2: TRANG LÀM BÀI CÁC PHẦN (3 TABS)
 # ==========================================
 def render_exam_page(exam_code):
     exams = load_exam_data()
@@ -436,8 +487,9 @@ def render_exam_page(exam_code):
     # Header trang thi
     col_head1, col_head2 = st.columns([3, 1])
     with col_head1:
-        st.markdown(f"## 📝 Đề Thi: <span style='color:#1A365D;'>{exam_code}</span>", unsafe_allow_html=True)
-        st.markdown(f"**Học viên:** `{st.session_state.student_name}` ({st.session_state.student_id})")
+        st.markdown(f"# LUYỆN ĐỀ HSK3 - <span style='color:#1A365D;'>{exam_code}</span>", unsafe_allow_html=True)
+        class_str = f" - Lớp: {st.session_state.class_name}" if st.session_state.class_name else ""
+        st.markdown(f"**Học viên:** `{st.session_state.student_name}`{class_str}")
     with col_head2:
         if st.button("⬅️ Trở về chọn đề khác"):
             st.session_state.selected_exam = None
@@ -494,7 +546,7 @@ def render_exam_page(exam_code):
 
 
 # ==========================================
-# 7. HÀM HIỂN THỊ CHI TIẾT TỪNG PHẦN THI
+# 8. HÀM HIỂN THỊ CHI TIẾT TỪNG PHẦN THI
 # ==========================================
 def render_section_tab(exam_code, section_key, section_title, questions, max_time_sec, audio_file=None):
     st.subheader(f"📌 {section_title}")
@@ -506,20 +558,9 @@ def render_section_tab(exam_code, section_key, section_title, questions, max_tim
     elapsed = time.time() - start_time
     remaining_sec = max(0, int(max_time_sec - elapsed))
 
-    mins, secs = divmod(remaining_sec, 60)
-    timer_text = f"⏱️ Thời gian còn lại: {mins:02d}:{secs:02d}"
-
+    # Nếu chưa nộp, hiển thị Đồng hồ đếm ngược Javascript chạy thực tế
     if not is_submitted:
-        if remaining_sec <= 300 and remaining_sec > 0:
-            st.markdown(f"<div class='timer-box timer-warning'>⚠️ SẮP HẾT GIỜ! {timer_text}</div>", unsafe_allow_html=True)
-            st.warning("⏰ Bạn còn ít hơn 5 phút. Hãy kiểm tra kỹ và bấm nộp bài!")
-        elif remaining_sec <= 0:
-            st.error("🚨 ĐÃ HẾT GIỜ LÀM BÀI! Tự động nộp phần này...")
-            st.session_state.submitted_sections[section_id] = True
-            is_submitted = True
-            st.rerun()
-        else:
-            st.markdown(f"<div class='timer-box'>{timer_text}</div>", unsafe_allow_html=True)
+        render_live_timer(remaining_sec, section_key)
 
     if audio_file and section_key == "listening":
         st.info(f"📻 Audio đính kèm: `{audio_file}` (Tên file audio trùng mã đề)")
@@ -528,6 +569,29 @@ def render_section_tab(exam_code, section_key, section_title, questions, max_tim
     st.write("")
 
     answers_key_prefix = f"ans_{exam_code}_{section_key}"
+
+    # Nếu đã nộp bài, hiển thị Dòng thông báo đúng yêu cầu
+    if is_submitted:
+        correct_count = sum([
+            1 for q in questions if (
+                (st.session_state.user_answers.get(f"{answers_key_prefix}_{q['id']}", "").strip() == q["correct"].strip())
+                if q["type"] in ["reorder", "char_fill"]
+                else (st.session_state.user_answers.get(f"{answers_key_prefix}_{q['id']}", "") == q["answer"])
+            )
+        ])
+        total_q = len(questions)
+        pct = round((correct_count / total_q) * 100, 1) if total_q > 0 else 0
+
+        st.markdown(f"""
+        <div class="completion-banner">
+            <h2 style="color: #137333; margin: 0; font-size: 22px; font-weight: bold;">
+                🎉 Chúc mừng "{st.session_state.student_name}" đã hoàn thành đề "{exam_code}" ({section_title})
+            </h2>
+            <p style="font-size: 19px; color: #2D3748; margin-top: 12px; font-weight: bold;">
+                Điểm số của bạn là: <span style="color: #137333; font-size: 26px;">{correct_count}/{total_q}</span> ({pct}%)
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
     for idx, q in enumerate(questions):
         q_id = q["id"]
@@ -595,24 +659,14 @@ def render_section_tab(exam_code, section_key, section_title, questions, max_tim
 
             send_score_to_google_sheet(
                 student_name=st.session_state.student_name,
-                student_id=st.session_state.student_id,
+                class_name=st.session_state.class_name,
                 exam_code=exam_code,
                 section=section_key,
                 score=correct_count,
                 total_questions=len(questions)
             )
 
-            st.success(f"🎉 Nộp bài thành công! Bạn đạt {correct_count}/{len(questions)} câu đúng. Điểm đã được tự động gửi về Google Sheet cho Cô Bảo Ngọc!")
             st.rerun()
-    else:
-        correct_count = sum([
-            1 for q in questions if (
-                (st.session_state.user_answers.get(f"{answers_key_prefix}_{q['id']}", "").strip() == q["correct"].strip())
-                if q["type"] in ["reorder", "char_fill"]
-                else (st.session_state.user_answers.get(f"{answers_key_prefix}_{q['id']}", "") == q["answer"])
-            )
-        ])
-        st.success(f"📊 PHẦN NÀY ĐÃ NỘP: Kết quả: **{correct_count} / {len(questions)}** câu đúng ({int(correct_count/len(questions)*100)}%).")
 
 
 def main():
