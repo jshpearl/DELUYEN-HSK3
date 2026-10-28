@@ -32,6 +32,17 @@ st.markdown("""
         background-color: #F8F9FA;
     }
 
+    /* Che/Ẩn Menu, Header, Deploy Button & Toolbar góc trên bên phải */
+    #MainMenu {visibility: hidden !important;}
+    header {visibility: hidden !important;}
+    footer {visibility: hidden !important;}
+    [data-testid="stHeader"] {display: none !important;}
+    [data-testid="stToolbar"] {display: none !important;}
+    [data-testid="stDecoration"] {display: none !important;}
+    [data-testid="stStatusWidget"] {display: none !important;}
+    .stAppHeader {display: none !important;}
+
+
     .question-box {
         background-color: #FFFFFF;
         border-left: 5px solid #4A5568;
